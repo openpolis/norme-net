@@ -1,2 +1,7 @@
 # Ignore output of scraper
 data.sqlite
+
+.idea
+*.ipynb
+.ipynb_checkpoints/
+
