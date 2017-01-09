@@ -290,8 +290,8 @@ def process_permalinks(permalinks, session=None):
 if __name__ == '__main__':
 
     norme_anno = OrderedDict([
-        (2016, 10),
-        # (2015, 222),
+        (2016, 249),
+        (2015, 222),
         # (2014, 203),
         # (2013, 159),
         # (2012, 263),
