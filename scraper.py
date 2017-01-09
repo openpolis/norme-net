@@ -158,7 +158,7 @@ def process_permalinks(permalinks, session=None):
         norma_res = session.get(norma_url)
         norma_el = lxml.html.fromstring(norma_res.content)
 
-        (norma_name, norma_type) = _get_name_type_year(norma_urn)
+        norma_name, norma_type, norma_year = _get_name_type_year(norma_urn)
         testa = norma_el.cssselect('#testa_atto p')
         titolo = testa[0].text
         title = ' '.join(
@@ -178,7 +178,8 @@ def process_permalinks(permalinks, session=None):
             'Description': description,
             'Image': '',
             'Reference': norma_url,
-            'URN': norma_urn
+            'URN': norma_urn,
+            'Year': norma_year
         }
         scraperwiki.sql.save(
             ['Type', 'Name'],
@@ -223,7 +224,7 @@ def process_permalinks(permalinks, session=None):
         for l in links:
             l_url = _get_absolute_url(l)
             l_urn = l.split('?')[1].split('!')[0]
-            name, type = _get_name_type_year(l_urn)
+            name, type, year = _get_name_type_year(l_urn)
 
             nodes_data.append({
                 'Type': type,
@@ -232,7 +233,8 @@ def process_permalinks(permalinks, session=None):
                 'Description': '',
                 'Image': '',
                 'Reference': l_url,
-                'URN': l_urn
+                'URN': l_urn,
+                'Year': year
             })
             edges_data.append({
                 'From Type': norma_type,
@@ -261,7 +263,12 @@ if __name__ == '__main__':
         (2015, 222),
         (2014, 203),
         (2013, 159),
-        (2012, 263)
+        (2012, 263),
+        (2011, 237),
+        (2010, 277),
+        (2009, 220),
+        (2008, 222),
+        (2007, 278),
     ])
 
     # genera istanza di navigazione,

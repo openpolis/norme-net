@@ -1,6 +1,9 @@
 # Ignore output of scraper
 data.sqlite
+*.csv
 
+
+.DS_Store
 .idea
 *.ipynb
 .ipynb_checkpoints/
