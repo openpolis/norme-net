@@ -1,4 +1,6 @@
 from collections import OrderedDict
+
+from datetime import datetime
 import lxml.html
 import requests
 import scraperwiki
@@ -81,6 +83,57 @@ def _get_permalink(tmp_url, session=None):
     return norma_urn_href
 
 
+def _get_name_type_year(norma_urn):
+    """Extract name, type and year from a urn.
+    Return None in case of parser error
+
+    :param norma_urn: the urn, containing the number
+    :return: tuple with name and type or None
+    """
+    norma_inner_urn, norma_number = norma_urn.split(';')
+    norma_dotted_type = norma_inner_urn.split(':')[3]
+    norma_type = ' '.join(
+        map(
+            lambda x: x.title(),
+            norma_dotted_type.split('.')
+        )
+    )
+    norma_type_initials = ''.join(
+        map(lambda x: x[0] + ".", norma_type.split())
+    )
+    original_date = norma_inner_urn.split(':')[4]
+    norma_date = norma_year = None
+    try:
+        norma_date = datetime.strptime(
+            original_date, '%Y-%m-%d'
+        ).strftime('%d/%m/%Y')
+        norma_year = datetime.strptime(
+            original_date, '%Y-%m-%d'
+        ).strftime('%Y')
+    except ValueError:
+        try:
+            norma_date = datetime.strptime(
+                original_date, '%Y'
+            ).strftime('%Y')
+            norma_year = norma_date
+        except ValueError as e:
+            if 'unconverted data remains' in e.args[0]:
+                unconverted_data = e.args[0].split(':')[1].strip()
+                norma_date = original_date.replace(unconverted_data, '')
+                try:
+                    norma_date = datetime.strptime(norma_date, '%Y').strftime('%Y')
+                    norma_year = norma_date
+                except ValueError:
+                    return None
+
+    norma_name = "{0} {1} del {2}".format(
+        norma_type_initials, norma_number,
+        norma_date
+    )
+
+    return (norma_name, norma_type, norma_year)
+
+
 def process_permalinks(permalinks, session=None):
     """Processa una lista di permalink
 
@@ -98,12 +151,14 @@ def process_permalinks(permalinks, session=None):
         norma_url = _get_absolute_url(permalink_url)
         norma_urn = permalink_url.split('?')[1].split('!')[0]
 
+
         if 'urn' not in norma_urn:
             continue
 
         norma_res = session.get(norma_url)
         norma_el = lxml.html.fromstring(norma_res.content)
 
+        (norma_name, norma_type) = _get_name_type_year(norma_urn)
         testa = norma_el.cssselect('#testa_atto p')
         titolo = testa[0].text
         title = ' '.join(
@@ -117,12 +172,13 @@ def process_permalinks(permalinks, session=None):
         )
 
         data = {
-            'Type': 'Norma',
-            'Name': norma_urn,
+            'Type': norma_type,
+            'Name': norma_name,
             'Title': title,
             'Description': description,
             'Image': '',
-            'Reference': norma_url
+            'Reference': norma_url,
+            'URN': norma_urn
         }
         scraperwiki.sql.save(
             ['Type', 'Name'],
@@ -156,7 +212,7 @@ def process_permalinks(permalinks, session=None):
                 l.attrib['href'].split('~')[0]
                 for l in art_el.cssselect(
                     "#dx_dettaglio div.wrapper_pre pre a"
-                ) if 'urn' in l.attrib['href']
+                ) if 'urn' in l.attrib['href'] and ';' in l.attrib['href']
 
             ])
 
@@ -166,20 +222,24 @@ def process_permalinks(permalinks, session=None):
         edges_data = []
         for l in links:
             l_url = _get_absolute_url(l)
+            l_urn = l.split('?')[1].split('!')[0]
+            name, type = _get_name_type_year(l_urn)
+
             nodes_data.append({
-                'Type': 'Norma',
-                'Name': l.split('?')[1].split('!')[0],
+                'Type': type,
+                'Name': name,
                 'Title': '',
                 'Description': '',
                 'Image': '',
-                'Reference': l_url
+                'Reference': l_url,
+                'URN': l_urn
             })
             edges_data.append({
-                'From Type': 'Norma',
-                'From Name': norma_urn,
-                'Edge': 'REFERS TO',
-                'To Type': 'Norma',
-                'To Name': l.split('?')[1].split('!')[0]
+                'From Type': norma_type,
+                'From Name': norma_name,
+                'Edge': 'REFERS_TO',
+                'To Type': type,
+                'To Name': name
             })
         scraperwiki.sql.save(
             ['Type', 'Name'],
