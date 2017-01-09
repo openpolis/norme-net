@@ -124,7 +124,7 @@ def _get_name_type_year(norma_urn):
                     norma_date = datetime.strptime(norma_date, '%Y').strftime('%Y')
                     norma_year = norma_date
                 except ValueError:
-                    return None
+                    return (None, None, None)
 
     norma_name = "{0} {1} del {2}".format(
         norma_type_initials, norma_number,
@@ -159,6 +159,9 @@ def process_permalinks(permalinks, session=None):
         norma_el = lxml.html.fromstring(norma_res.content)
 
         norma_name, norma_type, norma_year = _get_name_type_year(norma_urn)
+        if norma_name is None:
+            continue
+
         testa = norma_el.cssselect('#testa_atto p')
         titolo = testa[0].text
         title = ' '.join(
@@ -225,6 +228,8 @@ def process_permalinks(permalinks, session=None):
             l_url = _get_absolute_url(l)
             l_urn = l.split('?')[1].split('!')[0]
             name, type, year = _get_name_type_year(l_urn)
+            if name is None:
+                continue
 
             nodes_data.append({
                 'Type': type,
@@ -260,15 +265,15 @@ if __name__ == '__main__':
 
     norme_anno = OrderedDict([
         (2016, 249),
-        (2015, 222),
-        (2014, 203),
-        (2013, 159),
-        (2012, 263),
-        (2011, 237),
-        (2010, 277),
-        (2009, 220),
-        (2008, 222),
-        (2007, 278),
+        # (2015, 222),
+        # (2014, 203),
+        # (2013, 159),
+        # (2012, 263),
+        # (2011, 237),
+        # (2010, 277),
+        # (2009, 220),
+        # (2008, 222),
+        # (2007, 278),
     ])
 
     # genera istanza di navigazione,
