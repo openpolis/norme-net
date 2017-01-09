@@ -7,6 +7,17 @@ import scraperwiki
 
 normattiva_url = "http://www.normattiva.it"
 
+
+def _get_relative_url(absolute_url, base_url=normattiva_url):
+    """elimina la base_url da una url assoluta
+
+    :param absolute_url:
+    :param base_url:
+    :return: string
+    """
+    return absolute_url.replace(base_url, '')
+
+
 def _get_absolute_url(relative_url, base_url=normattiva_url):
     """torna una url assoluta, partendo da una relativa
 
@@ -53,7 +64,7 @@ def _get_permalinks(tmp_url, session=None):
             )
         )
 
-    return permalinks
+    return filter(lambda x: x is not None, permalinks)
 
 
 def _get_permalink(tmp_url, session=None):
@@ -62,7 +73,7 @@ def _get_permalink(tmp_url, session=None):
 
     :param tmp_url:
     :param session: la sessione di navigazione in normattiva
-    :return:
+    :return: stringa o None
     """
     if session is None:
         print("La sessione deve essere specificata")
@@ -71,6 +82,8 @@ def _get_permalink(tmp_url, session=None):
     # si determina il permalink, con la URN permanente
     norma_res_tmp = session.get(tmp_url)
     norma_el_tmp = lxml.html.fromstring(norma_res_tmp.content)
+    if 'Provvedimento non trovato in banca dati' in norma_res_tmp.content:
+        return None
     permalink_href = norma_el_tmp.cssselect(
         "img[alt='Collegamento permanente']"
     )[0].getparent().attrib['href']
@@ -151,6 +164,7 @@ def process_permalinks(permalinks, session=None):
         norma_url = _get_absolute_url(permalink_url)
         norma_urn = permalink_url.split('?')[1].split('!')[0]
 
+        print(permalink_url)
 
         if 'urn' not in norma_urn:
             continue
@@ -162,17 +176,23 @@ def process_permalinks(permalinks, session=None):
         if norma_name is None:
             continue
 
+        titolo = ''
+        title = ''
+        description = ''
+
         testa = norma_el.cssselect('#testa_atto p')
-        titolo = testa[0].text
-        title = ' '.join(
-            titolo.strip().split()
-        )
+        if testa:
+            titolo = testa[0].text
+            title = ' '.join(
+                titolo.strip().split()
+            )
 
         testa = norma_el.cssselect('#testa_atto')
-        description = ' '.join(
-            testa[0].text_content().\
-                replace(titolo, '').strip().split()
-        )
+        if testa:
+            description = ' '.join(
+                testa[0].text_content().\
+                    replace(titolo, '').strip().split()
+            )
 
         data = {
             'Type': norma_type,
@@ -182,7 +202,8 @@ def process_permalinks(permalinks, session=None):
             'Image': '',
             'Reference': norma_url,
             'URN': norma_urn,
-            'Year': norma_year
+            'Year': norma_year,
+            'Scraped': 1
         }
         scraperwiki.sql.save(
             ['Type', 'Name'],
@@ -231,16 +252,21 @@ def process_permalinks(permalinks, session=None):
             if name is None:
                 continue
 
-            nodes_data.append({
-                'Type': type,
-                'Name': name,
-                'Title': '',
-                'Description': '',
-                'Image': '',
-                'Reference': l_url,
-                'URN': l_urn,
-                'Year': year
-            })
+            node_exists = scraperwiki.sql.select(
+                "count(*) as n from Nodes where URN='%s'" % l_urn
+            )[0]['n']
+            if node_exists == 0:
+                nodes_data.append({
+                    'Type': type,
+                    'Name': name,
+                    'Title': '',
+                    'Description': '',
+                    'Image': '',
+                    'Reference': l_url,
+                    'URN': l_urn,
+                    'Year': year,
+                    'Scraped': 0,
+                })
             edges_data.append({
                 'From Type': norma_type,
                 'From Name': norma_name,
@@ -264,7 +290,7 @@ def process_permalinks(permalinks, session=None):
 if __name__ == '__main__':
 
     norme_anno = OrderedDict([
-        (2016, 249),
+        (2016, 10),
         # (2015, 222),
         # (2014, 203),
         # (2013, 159),
@@ -288,7 +314,7 @@ if __name__ == '__main__':
         })
 
         for anno, n_norme in norme_anno.items():
-            for k in range(1, n_norme+1):
+            for k in range(10, n_norme+1):
                 norma_url = "/uri-res/N2Ls?urn:nir:{0};{1}!vig=".format(
                     anno, k
                 )
@@ -302,5 +328,20 @@ if __name__ == '__main__':
                     ),
                     session=session
                 )
+                scraperwiki.status('ok')
 
+        # explore and solve referenced links (first passage)
+        referenced_links = [
+            res['Reference'] for res in
+            scraperwiki.sql.select("Reference from Nodes where Scraped = 0")
+        ]
+        for link in referenced_links:
+            process_permalinks(
+                _get_permalinks(
+                    _get_relative_url(link),
+                    session=session
+                ),
+                session=session
+            )
+            scraperwiki.status('ok')
 
