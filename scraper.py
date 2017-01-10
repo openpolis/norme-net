@@ -290,8 +290,8 @@ def process_permalinks(permalinks, session=None):
 if __name__ == '__main__':
 
     norme_anno = OrderedDict([
-        (2016, 249),
-        (2015, 222),
+        # (2016, 249),
+        # (2015, 222),
         # (2014, 203),
         # (2013, 159),
         # (2012, 263),
@@ -314,7 +314,7 @@ if __name__ == '__main__':
         })
 
         for anno, n_norme in norme_anno.items():
-            for k in range(10, n_norme+1):
+            for k in range(1, n_norme+1):
                 norma_url = "/uri-res/N2Ls?urn:nir:{0};{1}!vig=".format(
                     anno, k
                 )
@@ -331,10 +331,10 @@ if __name__ == '__main__':
                 scraperwiki.status('ok')
 
         # explore and solve referenced links (first passage)
-        referenced_links = [
+        referenced_links = set([
             res['Reference'] for res in
             scraperwiki.sql.select("Reference from Nodes where Scraped = 0")
-        ]
+        ])
         for link in referenced_links:
             process_permalinks(
                 _get_permalinks(
